@@ -3,7 +3,7 @@ Install dependent modules
 Run this from root:
 ```
 puppet module install badgerious-windows_env
-puppet module install maestrodev-wget
+puppet module install puppet-archive
 puppet module install puppet-download_file
 puppet module install puppetlabs-stdlib --force
 puppet module install puppetlabs-inifile

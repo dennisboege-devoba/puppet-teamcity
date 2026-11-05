@@ -34,7 +34,7 @@ describe 'teamcity', :type => 'class' do
       end
 
       context 'installation class tests' do
-        it { should contain_wget__fetch('teamcity-buildagent').with(
+        it { should contain_archive('teamcity-buildagent').with(
           'source' => 'http://builder/update/buildAgent.zip',
         # 'destination' => '/tmp/buildAgent.zip'  # TODO: tmp doesn't work on Mac
         ) }
@@ -42,7 +42,7 @@ describe 'teamcity', :type => 'class' do
         it { should contain_exec('extract-agent-archive').with(
           # 'command' => 'unzip /tmp/buildAgent.zip -d /opt/build-agent' # TODO `tmp` doesn't work on Mac
           'creates' => '/opt/build-agent/conf'
-        ).that_requires('Wget::Fetch[teamcity-buildagent]') }
+        ).that_requires('Archive[teamcity-buildagent]') }
 
         it { should contain_file('agent-config').
           with(

@@ -9,18 +9,19 @@ class teamcity::agent::install {
     $download_url = "${::teamcity::server_url}/update/${::teamcity::archive_name}"
   }
 
-  wget::fetch { 'teamcity-buildagent':
-    source      => $download_url,
-    destination => "${::temp_dir}/${::teamcity::archive_name}",
-    flags       => ['--no-proxy'],
-    timeout     => 0,
+  # ruby provider ignores http_proxy, download stays direct
+  archive { 'teamcity-buildagent':
+    path    => "${::temp_dir}/${::teamcity::archive_name}",
+    source  => $download_url,
+    extract => false,
+    cleanup => false,
   }
 
   exec { 'extract-agent-archive':
     command   => "unzip ${::temp_dir}/${::teamcity::archive_name} -d ${::teamcity::agent_dir}",
     creates   => "${::teamcity::agent_dir}/conf",
     logoutput => 'on_failure',
-    require   => Wget::Fetch['teamcity-buildagent'],
+    require   => Archive['teamcity-buildagent'],
   }
 
   file {'agent-config':
