@@ -2,10 +2,10 @@ fixtures:
   forge_modules:
     stdlib:
       repo: puppetlabs/stdlib
-      ref: 9.7.0
+      ref: 10.1.1
     inifile:
       repo: puppetlabs/inifile
-      ref: 6.5.0
+      ref: 6.6.0
     archive:
       repo: puppet/archive
-      ref: 8.1.0
+      ref: 9.0.0
