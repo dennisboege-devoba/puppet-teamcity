@@ -1,29 +1,30 @@
-# PRIVATE CLASS: do not call directly
+# @summary Manages the build agent systemd service
+#
+# @api private
+#
 class teamcity::agent::service {
-  if $teamcity::params::service_providers =~ Array {
-    # Verify the service provider given is in the array
-    if ! ($teamcity::service_provider in $teamcity::params::service_providers) {
-      fail("'${teamcity::service_provider}' is not a valid provider for '${facts['os']['name']}'")
-    }
-    $real_service_provider = $teamcity::service_provider
-  } else {
-    # There is only one option so simply set it
-    $real_service_provider = $teamcity::params::service_providers
+  assert_private()
+
+  file { '/etc/systemd/system/build-agent.service':
+    ensure  => 'file',
+    owner   => 'root',
+    group   => 'root',
+    mode    => '0644',
+    content => epp('teamcity/build-agent.service.epp', {
+      'agent_user' => $teamcity::agent_user,
+      'agent_dir'  => $teamcity::agent_dir,
+    }),
   }
 
-  case $real_service_provider {
-    'init': {
-      $class_name = 'initd'
-    }
-    'systemd': {
-      $class_name = 'systemd'
-    }
-    default: {
-      fail("Unknown service provider '${real_service_provider}'!")
-    }
+  # leftovers of module versions before 3.0.0
+  file { ['/lib/systemd/system/build-agent.service', '/etc/init.d/build-agent']:
+    ensure => 'absent',
   }
 
-  anchor { '::teamcity::agent::service::start': }
-  -> class{ "::teamcity::agent::service::${class_name}": }
-  -> anchor { '::teamcity::agent::service::end': }
+  service { 'build-agent':
+    ensure    => $teamcity::service_ensure,
+    enable    => $teamcity::service_enable,
+    subscribe => File['/etc/systemd/system/build-agent.service'],
+    require   => File['/lib/systemd/system/build-agent.service', '/etc/init.d/build-agent'],
+  }
 }

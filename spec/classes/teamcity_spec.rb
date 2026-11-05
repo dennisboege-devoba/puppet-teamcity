@@ -1,165 +1,99 @@
+# frozen_string_literal: true
+
 require 'spec_helper'
-require 'puppet'
 
-def include_systemd?(facts)
-  if ['RedHat', 'CentOS', 'Fedora', 'Scientific', 'OracleLinux', 'SLC'].include? facts[:operatingsystem] and Puppet::Util::Package.versioncmp(facts[:operatingsystemmajrelease], '7') >= 0
-    return true
-  elsif ['Debian'].include? facts[:operatingsystem] and Puppet::Util::Package.versioncmp(facts[:operatingsystemmajrelease], '8') >= 0
-    return true
-  elsif ['Ubuntu'].include? facts[:operatingsystem] and Puppet::Util::Package.versioncmp(facts[:operatingsystemmajrelease], '15') >= 0
-    return true
-  else
-    return false
-  end
-end
-
-describe 'teamcity', :type => 'class' do
-
-  default_params = {}
-
-  Puppet::Util::Log.level = :debug
-  Puppet::Util::Log.newdestination(:console)
-
-
-  on_supported_os.each do |os, facts|
+describe 'teamcity' do
+  on_supported_os.each do |os, os_facts|
     context "on #{os}" do
-      let(:facts) do
-        facts
-      end
+      let(:facts) { os_facts }
 
-      context 'main class tests' do
-        it { should compile.with_all_deps }
-        it { should contain_class('teamcity') }
-        it { should contain_class('teamcity::params') }
-      end
+      context 'with defaults' do
+        it { is_expected.to compile.with_all_deps }
 
-      context 'installation class tests' do
-        it { should contain_archive('teamcity-buildagent').with(
-          'source' => 'http://builder/update/buildAgent.zip',
-        # 'destination' => '/tmp/buildAgent.zip'  # TODO: tmp doesn't work on Mac
-        ) }
+        it { is_expected.to contain_package('unzip') }
+        it { is_expected.to contain_file('/opt/build-agent').with_ensure('directory') }
 
-        it { should contain_exec('extract-agent-archive').with(
-          # 'command' => 'unzip /tmp/buildAgent.zip -d /opt/build-agent' # TODO `tmp` doesn't work on Mac
-          'creates' => '/opt/build-agent/conf'
-        ).that_requires('Archive[teamcity-buildagent]') }
-
-        it { should contain_file('agent-config').
-          with(
-            'ensure' => 'file',
-            'path' => '/opt/build-agent/conf/buildAgent.properties',
-            'replace' => 'no',
-            'group' => 'teamcity',
-            'owner' => 'teamcity',
-          ).
-          that_requires('Exec[extract-agent-archive]')
-        }
-
-        it { should contain_exec('chown-agent-dir').with(
-          'command' => 'chown -R teamcity:teamcity /opt/build-agent'
-        ).that_requires('Exec[extract-agent-archive]').
-          that_subscribes_to('Exec[extract-agent-archive]')
-        }
-
-        it { should contain_file('/opt/build-agent/bin/agent.sh').
-          with('mode' => '0755').
-          that_requires('Exec[extract-agent-archive]')
-        }
-      end
-
-      context 'configuration class tests' do
-
-        # TODO: how to check for a function call `create_ini_settings`?
-
-        unless include_systemd?(facts)
-          context 'with init.d system' do
-            let (:params) { default_params.merge({:service_provider => 'init'}) }
-            it { should contain_file('/etc/init.d/build-agent').with(
-              'ensure' => 'file',
-              'content' => /File is managed by Puppet/
-            ) }
-            it { should contain_file('/lib/systemd/system/build-agent.service').with(
-              'ensure' => 'absent'
-            ) }
-
-            it 'should render init template' do
-              harness = TemplateHarness.new('templates/build-agent.erb', params)
-              harness.set('@agent_dir', '/opt/build-agent')
-              result = harness.run
-              expect(result).to match /\/opt\/build-agent\/bin\/agent\.sh/
-            end
-          end
-
-          it { should contain_file('/etc/profile.d/teamcity.sh').with(
-            'owner' => 'root',
-            'group' => 'root',
-            'mode' => '0755',
-            'content' => /export TEAMCITY_AGENT_MEM_OPTS=/
-          ) }
-
-          context 'service class tests' do
-            context 'with init.d system' do
-              let (:params) { default_params.merge({:service_provider => 'init'}) }
-
-              it { should contain_service('build-agent').with(
-                'ensure' => 'running',
-                'enable' => true,
-                'provider' => nil
-              ).
-                that_requires('File[/etc/init.d/build-agent]')
-              }
-
-              it { should contain_file('/lib/systemd/system/build-agent.service').with(
-                'ensure' => 'absent'
-              ) }
-            end
-          end
+        it do
+          is_expected.to contain_archive('teamcity-buildagent').with(
+            path: '/tmp/buildAgent.zip',
+            source: 'http://builder/update/buildAgent.zip',
+            extract: true,
+            extract_path: '/opt/build-agent',
+            creates: '/opt/build-agent/conf',
+            cleanup: true,
+          ).that_requires(['File[/opt/build-agent]', 'Package[unzip]'])
         end
 
-        if include_systemd?(facts)
-          context 'with systemd system' do
-            let (:params) { default_params.merge({:service_provider => 'systemd'}) }
-            it { should contain_file('/lib/systemd/system/build-agent.service').with(
-              'ensure' => 'file',
-              'owner' => 'root',
-              'group' => 'root',
-              'mode' => '0755',
-              'content' => /Description=TeamCity Build Agent/
-            ).
-              that_notifies('Exec[systemd_reload]')
-            }
-            it { should contain_file('/etc/init.d/build-agent').with(
-              'ensure' => 'absent'
-            ) }
-
-            it 'should render systemd template' do
-              harness = TemplateHarness.new('templates/build-agent-service.erb', params)
-              harness.set('@agent_dir', '/opt/build-agent')
-              result = harness.run
-              expect(result).to match /ExecStart=\/opt\/build-agent\/bin\/agent\.sh start/
-            end
-
-            it { should contain_service('build-agent.service').with(
-              'ensure' => 'running',
-              'enable' => true,
-              'provider' => 'systemd'
-            ).
-              that_requires('File[/lib/systemd/system/build-agent.service]')
-            }
-
-            it { should contain_exec('systemd_reload').with(
-              'command' => '/bin/systemctl daemon-reload',
-              'refreshonly' => true
-            ).
-              that_subscribes_to('File[/lib/systemd/system/build-agent.service]')
-            }
-
-            it { should contain_file('/etc/init.d/build-agent').with(
-              'ensure' => 'absent'
-            ) }
-          end
+        it do
+          is_expected.to contain_file('agent-config').with(
+            path: '/opt/build-agent/conf/buildAgent.properties',
+            replace: false,
+            owner: 'teamcity',
+            group: 'teamcity',
+          ).that_requires('Archive[teamcity-buildagent]')
         end
 
+        it do
+          is_expected.to contain_exec('chown-agent-dir')
+            .with_command('chown -R teamcity:teamcity /opt/build-agent')
+            .that_subscribes_to('Archive[teamcity-buildagent]')
+        end
+
+        it { is_expected.to contain_ini_setting('/opt/build-agent/conf/buildAgent.properties [] serverUrl').with_value('http://builder') }
+        it { is_expected.to contain_ini_setting('/opt/build-agent/conf/buildAgent.properties [] name').with_value(os_facts[:networking]['hostname']) }
+
+        it do
+          is_expected.to contain_file('/etc/profile.d/teamcity.sh')
+            .with_mode('0644')
+            .with_content(%r{^export TEAMCITY_AGENT_MEM_OPTS="-Xms512m })
+        end
+
+        it do
+          is_expected.to contain_file('/etc/systemd/system/build-agent.service')
+            .with_mode('0644')
+            .with_content(%r{^User=teamcity$})
+            .with_content(%r{^ExecStart=/opt/build-agent/bin/agent\.sh start$})
+        end
+
+        it { is_expected.to contain_file('/lib/systemd/system/build-agent.service').with_ensure('absent') }
+        it { is_expected.to contain_file('/etc/init.d/build-agent').with_ensure('absent') }
+
+        it do
+          is_expected.to contain_service('build-agent').with(
+            ensure: 'running',
+            enable: true,
+          ).that_subscribes_to('File[/etc/systemd/system/build-agent.service]')
+        end
+
+        it { is_expected.to contain_class('teamcity::agent::config').that_notifies('Class[teamcity::agent::service]') }
+        it { is_expected.not_to contain_user('teamcity') }
+        it { is_expected.not_to contain_group('teamcity') }
+      end
+
+      context 'with managed account and custom settings' do
+        let(:params) do
+          {
+            manage_user: true,
+            manage_group: true,
+            agent_dir: '/srv/agent',
+            download_url: 'https://tc.example.com/agent.zip',
+            custom_properties: { 'env.FOO' => 'bar' },
+          }
+        end
+
+        it { is_expected.to compile.with_all_deps }
+        it { is_expected.to contain_group('teamcity') }
+        it { is_expected.to contain_user('teamcity').with(home: '/srv/agent', gid: 'teamcity') }
+        it { is_expected.to contain_archive('teamcity-buildagent').with_source('https://tc.example.com/agent.zip') }
+        it { is_expected.to contain_ini_setting('/srv/agent/conf/buildAgent.properties [] env.FOO').with_value('bar') }
+        it { is_expected.to contain_file('/etc/systemd/system/build-agent.service').with_content(%r{^PIDFile=/srv/agent/logs/buildAgent\.pid$}) }
+      end
+
+      context 'with deprecated service_provider' do
+        let(:params) { { service_provider: 'init' } }
+
+        it { is_expected.to compile.with_all_deps }
+        it { is_expected.to contain_service('build-agent') }
       end
     end
   end

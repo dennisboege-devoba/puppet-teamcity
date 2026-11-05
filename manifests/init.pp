@@ -1,98 +1,73 @@
-# == Class: teamcity
+# @summary Installs and configures a TeamCity build agent
 #
-# This class is able to install and configure TeamCity on node.
+# @example
+#   include teamcity
 #
-# === Parameters
-#
-# [*agent_name*]
-#   Build agent name, that will be displayed on TeamCity server.
-#   Defaults to hostname.
-#
-# [*agent_user*]
-#   User name, which will be used to run and configure build agent.
-#   Defaults to `teamcity`.
-#
-# [*agent_user_home*]
-#   If user is managed, set it's home dir.
-#   Defaults to $agent_dir.
-#
-# [*manage_agent_user_home*]
-#   Manage whether to create home dir for user.
-#   Defaults to `false`.
-#
-# [*agent_group*]
-#   Name of group to be used for build agent.
-#   Defaults to `teamcity`.
-#
-# [*manage_user*]
-#   Whether to create user for build agent.
-#   Defaults to `false`.
-#
-# [*manage_group*]
-#   Whether to create group for build agent.
-#   Defaults to `false`.
-#
-# [*server_url*]
-#   Root url of Teamcity server. It will be used in agent's config.
-#   Defaults to `http://builder`.
-#
-# [*archive_name*]
-#   Name of archive that should be downloaded from `server_url`.
-#   Defaults to `buildAgent.zip`.
-#
-# [*download_url*]
-#   Calculated parameter, that is used to download build agent distributive.
-#   Defaults to `${server_url}/update/${archive_name}`.
-#
-# [*agent_dir*]
-#   Installation path, where build agent will reside.
-#   Defaults to `/opt/build-agent`.
-#
-# [*service_ensure*]
-#   Required service status.
-#   Defaults to `running`.
-#
-# [*service_enable*]
-#   Should the service be enabled
-#   Defaults to `true`.
-#
-# [*service_provider*]
-#   Service type
-#   On windows defaults to `service`, on Linux defaults to `init`.
-#
-# [*teamcity_agent_mem_opts*]
-#   String for configuring additional java parameters for build agent
-#
-# [*custom_properties*]
-#   Hash of custom properties, that will be applied to conf/buildAgent.properties
-#
-# [*launcher_wrapper_conf*]
-#   Hash of custom properties, that will be applied to launcher/conf/wrapper.conf
-#
+# @param agent_name
+#   Build agent name, displayed on the TeamCity server.
+# @param agent_user
+#   User that runs the build agent.
+# @param agent_user_home
+#   Home directory of a managed user. Defaults to `agent_dir`.
+# @param manage_agent_user_home
+#   Whether to create the home directory of a managed user.
+# @param agent_group
+#   Group of the build agent user.
+# @param manage_user
+#   Whether to create the build agent user.
+# @param manage_group
+#   Whether to create the build agent group.
+# @param server_url
+#   Root URL of the TeamCity server, written to the agent config.
+# @param archive_name
+#   Name of the agent archive on the server.
+# @param download_url
+#   URL of the agent archive. Defaults to `${server_url}/update/${archive_name}`.
+# @param agent_dir
+#   Installation directory of the build agent.
+# @param service_ensure
+#   State of the build agent service.
+# @param service_enable
+#   Whether the build agent service starts at boot.
+# @param service_provider
+#   Deprecated and ignored, the agent always runs as systemd service.
+# @param teamcity_agent_mem_opts
+#   Java options exported as `TEAMCITY_AGENT_MEM_OPTS`.
+# @param custom_properties
+#   Settings merged into `conf/buildAgent.properties`.
+# @param launcher_wrapper_conf
+#   Settings merged into `launcher/conf/wrapper.conf`.
 #
 class teamcity (
-  $agent_name              = $teamcity::params::agent_name,
+  String[1] $agent_name = $facts['networking']['hostname'],
+  String[1] $agent_user = 'teamcity',
+  Optional[Stdlib::Absolutepath] $agent_user_home = undef,
+  Boolean $manage_agent_user_home = false,
+  String[1] $agent_group = 'teamcity',
+  Boolean $manage_user = false,
+  Boolean $manage_group = false,
+  Stdlib::HTTPUrl $server_url = 'http://builder',
+  String[1] $archive_name = 'buildAgent.zip',
+  Optional[Stdlib::HTTPUrl] $download_url = undef,
+  Stdlib::Absolutepath $agent_dir = '/opt/build-agent',
+  Stdlib::Ensure::Service $service_ensure = 'running',
+  Boolean $service_enable = true,
+  Optional[String] $service_provider = undef,
+  String $teamcity_agent_mem_opts = '-Xms512m -Xmx1024m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8',
+  Hash $custom_properties = {},
+  Hash $launcher_wrapper_conf = {},
+) {
+  if $service_provider {
+    warning('teamcity::service_provider is deprecated and ignored, the agent always runs as systemd service')
+  }
 
-  $agent_user              = $teamcity::params::agent_user,
-  $agent_user_home         = $teamcity::params::agent_user_home,
-  $manage_agent_user_home  = $teamcity::params::manage_agent_user_home,
-  $agent_group             = $teamcity::params::agent_group,
-  $manage_user             = $teamcity::params::manage_user,
-  $manage_group            = $teamcity::params::manage_group,
+  contain teamcity::account
+  contain teamcity::agent::install
+  contain teamcity::agent::config
+  contain teamcity::agent::service
 
-  $server_url              = $teamcity::params::server_url,
-  $archive_name            = $teamcity::params::archive_name,
-  $download_url            = $teamcity::params::download_url,
-  $agent_dir               = $teamcity::params::agent_dir,
-
-  $service_ensure          = $teamcity::params::service_ensure,
-  $service_enable          = $teamcity::params::service_enable,
-  $service_provider        = $teamcity::params::service_provider,
-  $teamcity_agent_mem_opts = $teamcity::params::teamcity_agent_mem_opts,
-  $custom_properties       = $teamcity::params::custom_properties,
-  $launcher_wrapper_conf   = $teamcity::params::launcher_wrapper_conf,
-) inherits ::teamcity::params {
-  anchor { '::teamcity::begin': }
-  -> class { '::teamcity::agent': }
-  -> anchor { '::teamcity::end': }
+  Class['teamcity::account']
+  -> Class['teamcity::agent::install']
+  -> Class['teamcity::agent::config']
+  ~> Class['teamcity::agent::service']
 }

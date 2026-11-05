@@ -1,4 +1,3 @@
-require 'puppetlabs_spec_helper/module_spec_helper'
-require 'rspec-puppet-utils'
-require 'rspec-puppet-facts'
-include RspecPuppetFacts
+require 'voxpupuli/test/spec_helper'
+
+add_custom_fact :temp_dir, '/tmp'

@@ -12,3 +12,4 @@ spec/reports/
 spec/logs
 .idea
 
+.yardoc/

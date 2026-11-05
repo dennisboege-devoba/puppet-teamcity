@@ -1,0 +1,7 @@
+<%- | String $mem_opts | -%>
+#!/bin/sh
+#
+# File is managed by Puppet.
+#
+
+export TEAMCITY_AGENT_MEM_OPTS="<%= $mem_opts %>"
