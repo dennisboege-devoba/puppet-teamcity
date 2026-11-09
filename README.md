@@ -50,6 +50,19 @@ All parameters are documented in [REFERENCE.md](REFERENCE.md).
 
 ```sh
 bundle install
-bundle exec rake test
+bundle exec rake test rubocop
 bundle exec rake strings:generate:reference
 ```
+
+The integration tests install the agent with test-kitchen in systemd containers
+and check that it registers with a TeamCity server:
+
+```sh
+docker network create kitchen
+docker run -d --name teamcity-server --network kitchen \
+  -e TEAMCITY_SERVER_OPTS="-Dteamcity.startup.maintenance=false -Dteamcity.licenseAgreement.accepted=true" \
+  jetbrains/teamcity-server:2026.2.2
+bundle exec kitchen test
+```
+
+Agents of TeamCity 2026.2 need Java 21, which this module does not install.

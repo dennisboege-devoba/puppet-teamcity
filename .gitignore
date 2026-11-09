@@ -13,3 +13,7 @@ spec/logs
 .idea
 
 .yardoc/
+.kitchen
+/test/integration/**/.librarian
+/test/integration/**/.tmp
+/test/integration/*/puppet/Puppetfile.lock

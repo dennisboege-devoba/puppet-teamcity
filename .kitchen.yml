@@ -1,0 +1,64 @@
+---
+# The agent registers with a TeamCity server container named teamcity-server
+# on the docker network "kitchen", see README.md.
+driver:
+  name: "docker"
+  use_sudo: false
+  memory: "2G"
+  privileged: true
+  run_command: "/lib/systemd/systemd"
+  volume:
+    - "/sys/fs/cgroup:/sys/fs/cgroup:rw"
+  run_options:
+    network: "kitchen"
+    cgroupns: "host"
+
+transport:
+  name: "docker"
+
+provisioner:
+  name: "puppet_apply"
+  manifest: "site.pp"
+  # kitchen-puppet installs the package "puppet-agent", which is Puppet 7 on Debian,
+  # so openvox-agent is installed by the driver instead
+  require_puppet_collections: false
+  require_puppet_repo: false
+  puppet_binary: "/opt/puppetlabs/bin/puppet"
+  # without detailed exit codes a failed puppet run still counts as converged
+  puppet_detailed_exitcodes: true
+  puppet_whitelist_exit_code: [0, 2]
+  ignored_paths_from_root:
+    - "spec"
+    - "vendor"
+  ignore_spec_fixtures: true
+  spec_files_path: "test/integration/default/serverspec"
+
+platforms:
+<% {
+  'debian-12'    => ['debian12', 'temurin-21-jre'],
+  'debian-13'    => ['debian13', 'openjdk-21-jre-headless'],
+  'ubuntu-24.04' => ['ubuntu24.04', 'openjdk-21-jre-headless'],
+}.each_pair do |platform, (release, java)| %>
+  - name: "<%= platform %>"
+    driver:
+      provision_command:
+        - apt-get install -y systemd systemd-sysv wget ca-certificates ruby ruby-bundler
+        # Debian 13 mounts a tmpfs on /tmp, which hides the files kitchen copies there
+        - systemctl mask tmp.mount
+        # the TeamCity agent needs Java 21, which Debian 12 only gets from Adoptium
+        - wget -q -O /etc/apt/keyrings/adoptium.asc https://packages.adoptium.net/artifactory/api/gpg/key/public
+        - echo "deb [signed-by=/etc/apt/keyrings/adoptium.asc] https://packages.adoptium.net/artifactory/deb $(. /etc/os-release && echo $VERSION_CODENAME) main" > /etc/apt/sources.list.d/adoptium.list
+        - apt-get update && apt-get install -y <%= java %>
+        - wget -q -O /tmp/openvox8-release.deb https://apt.voxpupuli.org/openvox8-release-<%= release %>.deb
+        - dpkg -i /tmp/openvox8-release.deb && apt-get update && apt-get install -y openvox-agent
+<% end %>
+
+# without patterns kitchen-verifier-serverspec runs no specs at all and still passes
+verifier:
+  name: serverspec
+  patterns:
+    - "/etc/puppet/spec/localhost/*_spec.rb"
+  extra_flags: "-I /etc/puppet/spec"
+
+suites:
+  - name: "default"

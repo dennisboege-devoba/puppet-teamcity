@@ -26,3 +26,28 @@ jobs:
           bundler-cache: true
       - name: Run static and unit tests
         run: bundle exec rake test rubocop
+
+  integration:
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ['debian-12', 'debian-13', 'ubuntu-2404']
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+      - name: Start TeamCity server
+        run: |
+          docker network create kitchen
+          docker run -d --name teamcity-server --network kitchen -p 8111:8111 \
+            -e TEAMCITY_SERVER_OPTS="-Dteamcity.startup.maintenance=false -Dteamcity.licenseAgreement.accepted=true" \
+            jetbrains/teamcity-server:2026.2.2
+          timeout 600 sh -c 'until curl -sf -o /dev/null http://localhost:8111/update/buildAgent.zip; do sleep 10; done'
+      - name: Run integration tests
+        run: bundle exec kitchen test default-${{ matrix.platform }} --destroy=always
+        timeout-minutes: 30
