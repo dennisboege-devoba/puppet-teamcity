@@ -60,7 +60,7 @@ describe 'teamcity' do
 
         it do
           is_expected.to contain_service('build-agent.service').with(
-            ensure: 'running',
+            ensure: true,
             enable: true,
           )
         end
