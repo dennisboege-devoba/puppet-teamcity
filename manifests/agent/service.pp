@@ -19,8 +19,8 @@ class teamcity::agent::service {
   systemd::unit_file { 'build-agent.service':
     ensure  => 'present',
     content => epp('teamcity/build-agent.service.epp', {
-        'agent_user' => $teamcity::agent_user,
-        'agent_dir'  => $teamcity::agent_dir,
+      'agent_user' => $teamcity::agent_user,
+      'agent_dir'  => $teamcity::agent_dir,
     }),
     active  => $_active,
     enable  => $teamcity::service_enable,
