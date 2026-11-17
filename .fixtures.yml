@@ -9,3 +9,6 @@ fixtures:
     archive:
       repo: puppet/archive
       ref: 9.0.0
+    systemd:
+      repo: puppet/systemd
+      ref: 11.1.0
