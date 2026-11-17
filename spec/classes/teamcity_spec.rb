@@ -50,7 +50,7 @@ describe 'teamcity' do
 
         it do
           is_expected.to contain_file('/etc/systemd/system/build-agent.service')
-            .with_mode('0644')
+            .with_mode('0444')
             .with_content(%r{^User=teamcity$})
             .with_content(%r{^ExecStart=/opt/build-agent/bin/agent\.sh start$})
         end
@@ -59,10 +59,10 @@ describe 'teamcity' do
         it { is_expected.to contain_file('/etc/init.d/build-agent').with_ensure('absent') }
 
         it do
-          is_expected.to contain_service('build-agent').with(
+          is_expected.to contain_service('build-agent.service').with(
             ensure: 'running',
             enable: true,
-          ).that_subscribes_to('File[/etc/systemd/system/build-agent.service]')
+          )
         end
 
         it { is_expected.to contain_class('teamcity::agent::config').that_notifies('Class[teamcity::agent::service]') }
@@ -93,7 +93,7 @@ describe 'teamcity' do
         let(:params) { { service_provider: 'init' } }
 
         it { is_expected.to compile.with_all_deps }
-        it { is_expected.to contain_service('build-agent') }
+        it { is_expected.to contain_service('build-agent.service') }
       end
     end
   end
