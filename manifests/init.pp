@@ -5,38 +5,55 @@
 #
 # @param agent_name
 #   Build agent name, displayed on the TeamCity server.
+#   Defaults to the node's hostname.
 # @param agent_user
 #   User that runs the build agent.
+#   Defaults to `teamcity`.
 # @param agent_user_home
-#   Home directory of a managed user. Defaults to `agent_dir`.
+#   Home directory of a managed user.
+#   Defaults to `agent_dir`.
 # @param manage_agent_user_home
 #   Whether to create the home directory of a managed user.
+#   Defaults to `false`.
 # @param agent_group
 #   Group of the build agent user.
+#   Defaults to `teamcity`.
 # @param manage_user
 #   Whether to create the build agent user.
+#   Defaults to `false`.
 # @param manage_group
 #   Whether to create the build agent group.
+#   Defaults to `false`.
 # @param server_url
 #   Root URL of the TeamCity server, written to the agent config.
+#   Defaults to `http://builder`.
 # @param archive_name
 #   Name of the agent archive on the server.
+#   Defaults to `buildAgent.zip`.
 # @param download_url
-#   URL of the agent archive. Defaults to `${server_url}/update/${archive_name}`.
+#   URL of the agent archive.
+#   Defaults to `${server_url}/update/${archive_name}`.
 # @param agent_dir
 #   Installation directory of the build agent.
+#   Defaults to `/opt/build-agent`.
 # @param service_ensure
 #   State of the build agent service.
+#   Defaults to `running`.
 # @param service_enable
 #   Whether the build agent service starts at boot.
+#   Defaults to `true`.
 # @param service_provider
 #   Deprecated and ignored, the agent always runs as systemd service.
+#   Defaults to `undef`.
 # @param teamcity_agent_mem_opts
 #   Java options exported as `TEAMCITY_AGENT_MEM_OPTS`.
+#   Defaults to `-Xms512m -Xmx1024m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8`.
 # @param custom_properties
 #   Settings merged into `conf/buildAgent.properties`.
+#   Defaults to `{}`.
 # @param launcher_wrapper_conf
 #   Settings merged into `launcher/conf/wrapper.conf`.
+#   Defaults to `{}`.
 #
 class teamcity (
   String[1] $agent_name = $facts['networking']['hostname'],
